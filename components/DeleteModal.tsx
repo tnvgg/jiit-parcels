@@ -13,44 +13,30 @@ export default function DeleteModal({ requestId, onClose, onSuccess }: DeleteMod
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  async function handleDelete() {
-    setLoading(true)
-    setError('')
+async function handleDelete() {
+  setLoading(true)
+  setError('')
 
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        setError('Not authenticated. Please log in again.')
-        return
-      }
+  try {
+    const { error } = await supabase
+      .from('pickup_requests')
+      .delete()
+      .eq('id', requestId)
 
-      const res = await fetch('/api/delete-request', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ requestId })
-      })
-
-      const data = await res.json().catch(() => null)
-
-      if (!res.ok) {
-        setError(data?.error || 'Failed to delete request')
-        return
-      }
-
-      onSuccess()
-      onClose()
-      
-    } catch (err: any) {
-      console.error(err)
-      setError(err.message || 'Something went wrong')
-    } finally {
-      setLoading(false)
+    if (error) {
+      setError(error.message)
+      return
     }
+
+    onSuccess()
+    onClose()
+  } catch (err: any) {
+    setError(err.message || 'Something went wrong')
+  } finally {
+    setLoading(false)
   }
+}
+
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm">

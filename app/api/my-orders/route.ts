@@ -1,0 +1,67 @@
+import { NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase'
+import { decryptPhone } from '@/lib/crypto'
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+
+    const { data: requests, error } = await supabaseAdmin
+      .from('pickup_requests')
+      .select(`
+        *,
+        requester:profiles!requester_id(id, name, email, phone_encrypted, hostel, gender),
+        accepter:profiles!accepted_by(id, name, email, phone_encrypted, hostel, gender)
+      `)
+      .or(`requester_id.eq.${userId},accepted_by.eq.${userId}`)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      throw error
+    }
+
+    const safeOrders = requests?.map((req: any) => {
+      const isRequester = req.requester_id === userId
+      const isAccepter = req.accepted_by === userId
+      const isMatched = req.status === 'accepted'
+
+      let requesterPhone = null
+      let accepterPhone = null
+
+      if (req.requester?.phone_encrypted) {
+        if (isAccepter || isRequester) {
+             requesterPhone = decryptPhone(req.requester.phone_encrypted)
+        }
+      }
+
+      if (req.accepter?.phone_encrypted) {
+        if ((isRequester && isMatched) || isAccepter) {
+            accepterPhone = decryptPhone(req.accepter.phone_encrypted)
+        }
+      }
+
+      return {
+        ...req,
+        requester: req.requester ? {
+          ...req.requester,
+          phone: requesterPhone
+        } : null,
+        accepter: req.accepter ? {
+          ...req.accepter,
+          phone: accepterPhone
+        } : null
+      }
+    })
+
+    return NextResponse.json({ orders: safeOrders })
+
+  } catch (error: any) {
+    console.error('My orders error:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+  }
+}

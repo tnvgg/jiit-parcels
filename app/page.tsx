@@ -12,7 +12,7 @@ export default function HomePage() {
   const router = useRouter()
   const [requests, setRequests] = useState<PickupRequest[]>([])
   const [loading, setLoading] = useState(true)
-  const [checkingAuth, setCheckingAuth] = useState(true) // Added loading state for auth
+  const [checkingAuth, setCheckingAuth] = useState(true)
 
   const [currentUserId, setCurrentUserId] = useState<string>('')
   const [isBanned, setIsBanned] = useState(false)
@@ -21,13 +21,12 @@ export default function HomePage() {
   const [hostelFilter, setHostelFilter] = useState<Hostel | ''>('')
   const [gateFilter, setGateFilter] = useState<string>('')
 
-  // 1. STRICT AUTH CHECK
   useEffect(() => {
     async function checkUser() {
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session) {
-        router.replace('/login') // Use replace to prevent "back" button issues
+        router.replace('/login')
         return
       }
       
@@ -47,15 +46,15 @@ export default function HomePage() {
       if (profile) setIsBanned(profile.banned)
       
       setCheckingAuth(false)
-      fetchData(user.id)
     }
 
     checkUser()
   }, [router])
 
-  // 2. REALTIME SUBSCRIPTION
   useEffect(() => {
     if (!checkingAuth && currentUserId) {
+      fetchData()
+
       const channel = supabase
         .channel('pickup_requests_home')
         .on('postgres_changes', { 
@@ -63,7 +62,7 @@ export default function HomePage() {
           schema: 'public', 
           table: 'pickup_requests' 
         }, () => {
-          fetchData(currentUserId)
+          fetchData()
         })
         .subscribe()
 
@@ -71,21 +70,23 @@ export default function HomePage() {
     }
   }, [hostelFilter, gateFilter, checkingAuth, currentUserId])
 
-  async function fetchData(userId: string) {
-    if (requests.length === 0) setLoading(true)
+  async function fetchData() {
+    setLoading(true)
 
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+
     let query = supabase
       .from('pickup_requests')
       .select(`
         *,
-        requester:profiles!requester_id(id, name, email, phone, phone_encrypted, hostel, gender),
-        accepter:profiles!accepted_by(id, name, email, phone, phone_encrypted, hostel, gender)
+        requester:profiles!pickup_requests_requester_id_fkey(id, name, email, phone, phone_encrypted, hostel, gender),
+        accepter:profiles!pickup_requests_accepted_by_fkey(id, name, email, phone, phone_encrypted, hostel, gender)
       `)
       .eq('status', 'waiting')
-      .gt('created_at', twoHoursAgo)
+      .gte('created_at', twoHoursAgo)
       .order('price', { ascending: false })
 
+    // Apply Filters
     if (hostelFilter) query = query.eq('hostel', hostelFilter)
     if (gateFilter) query = query.eq('gate_number', gateFilter)
 
@@ -93,6 +94,7 @@ export default function HomePage() {
 
     if (error) {
       console.error('Error fetching requests:', error)
+      setRequests([])
     } else {
       const validRequests = (data || []).filter(
         (req: any) => req.requester !== null
@@ -103,7 +105,6 @@ export default function HomePage() {
     setLoading(false)
   }
 
-  // Show loading spinner while checking auth
   if (checkingAuth) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -115,28 +116,26 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-black text-gray-200 p-4 pb-20">
       <div className="max-w-2xl mx-auto space-y-6">
+        {}
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            JIIT Parcels
-          </h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">JIIT Parcels</h1>
           <div className="flex gap-2 items-center">
             {showAdminBtn && (
-              <button
-                onClick={() => router.push('/admin')}
-                className="bg-red-900/30 text-red-400 border border-red-900/50 px-3 py-2 rounded-full text-xs font-bold uppercase tracking-wider hover:bg-red-900/50 transition"
+              <button 
+                onClick={() => router.push('/admin')} 
+                className="bg-red-900/30 text-red-400 border border-red-900/50 px-3 py-2 rounded-full text-xs font-bold uppercase tracking-wider"
               >
                 Admin
               </button>
             )}
-
-            <button
-              onClick={() => router.push('/my-orders')}
+            <button 
+              onClick={() => router.push('/my-orders')} 
               className="bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-full text-sm font-medium transition border border-neutral-700"
             >
               My Activity
             </button>
-            <button
-              onClick={() => router.push('/new')}
+            <button 
+              onClick={() => router.push('/new')} 
               className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-full text-sm font-medium shadow-lg shadow-blue-900/20 transition"
             >
               + Request
@@ -144,6 +143,7 @@ export default function HomePage() {
           </div>
         </div>
 
+        {}
         <div className="bg-neutral-900/50 border border-neutral-800 p-4 rounded-xl flex flex-col sm:flex-row gap-3">
           <div className="flex-1">
             <label className="text-xs text-gray-500 mb-1 block uppercase tracking-wider">
@@ -179,26 +179,22 @@ export default function HomePage() {
           </div>
         </div>
 
+        {}
         {loading ? (
           <div className="text-center py-20 text-gray-500 animate-pulse">
             Loading live requests...
           </div>
         ) : requests.length === 0 ? (
           <div className="text-center py-20">
-            <h3 className="text-xl font-bold text-white mb-2">
-              No active requests
-            </h3>
+            <h3 className="text-xl font-bold text-white mb-2">No active requests</h3>
             <p className="text-gray-500 max-w-xs mx-auto">
-              {hostelFilter || gateFilter
-                ? 'Try changing your filters.'
+              {hostelFilter || gateFilter 
+                ? 'Try changing your filters.' 
                 : 'Requests older than 2 hours disappear automatically.'}
             </p>
             {(hostelFilter || gateFilter) && (
-              <button
-                onClick={() => {
-                  setHostelFilter('')
-                  setGateFilter('')
-                }}
+              <button 
+                onClick={() => { setHostelFilter(''); setGateFilter('') }} 
                 className="mt-4 text-blue-400 hover:text-blue-300 text-sm font-medium"
               >
                 Clear Filters
@@ -211,12 +207,12 @@ export default function HomePage() {
               Showing {requests.length} active requests • Sorted by Price
             </p>
             {requests.map((req) => (
-              <PickupCard
-                key={req.id}
-                request={req}
-                currentUserId={currentUserId}
-                isBanned={isBanned}
-                onUpdate={() => fetchData(currentUserId)}
+              <PickupCard 
+                key={req.id} 
+                request={req} 
+                currentUserId={currentUserId} 
+                isBanned={isBanned} 
+                onUpdate={fetchData} 
               />
             ))}
           </div>

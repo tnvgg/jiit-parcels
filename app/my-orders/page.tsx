@@ -17,23 +17,37 @@ export default function MyOrdersPage() {
   useEffect(() => {
     async function loadOrders() {
       try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
-        if (authError || !user) {
+        if (sessionError || !session?.user) {
+          console.error('Session error:', sessionError)
           router.push('/login')
           return
         }
         
+        const user = session.user
         setUserId(user.id)
+        
+        console.log('🔍 Fetching orders for user:', user.id)
 
-        const response = await fetch(`/api/my-orders?userId=${user.id}&t=${Date.now()}`)
+        const response = await fetch(`/api/my-orders?t=${Date.now()}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+        })
+        
+        console.log('📡 Response status:', response.status)
         
         if (!response.ok) {
           if (response.status === 401) {
+            console.error('Unauthorized - redirecting to login')
             router.push('/login')
             return
           }
-          throw new Error(`Server error: ${response.status}`)
+          const errorText = await response.text()
+          throw new Error(`Server error: ${response.status} - ${errorText}`)
         }
 
         const data = await response.json()
@@ -42,12 +56,14 @@ export default function MyOrdersPage() {
           throw new Error(data.error)
         }
         
+        console.log('✅ Received orders:', data.orders?.length || 0)
+        
         if (data.orders) {
           setRequests(data.orders)
         }
 
       } catch (err: any) {
-        console.error('Failed to load orders:', err)
+        console.error('❌ Failed to load orders:', err)
         setError(err.message || 'Failed to load orders')
       } finally {
         setLoading(false)
@@ -74,13 +90,24 @@ export default function MyOrdersPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
-        <p className="text-red-500">Error: {error}</p>
-        <button 
-          onClick={() => window.location.reload()} 
-          className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg"
-        >
-          Retry
-        </button>
+        <div className="text-center max-w-md">
+          <p className="text-red-500 mb-2">Error loading activity</p>
+          <p className="text-gray-400 text-sm mb-4">{error}</p>
+        </div>
+        <div className="flex gap-3">
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg"
+          >
+            Retry
+          </button>
+          <button 
+            onClick={() => router.push('/')} 
+            className="bg-neutral-700 hover:bg-neutral-600 text-white px-6 py-2 rounded-lg"
+          >
+            Go Home
+          </button>
+        </div>
       </div>
     )
   }

@@ -1,69 +1,50 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { decryptPhone } from '@/lib/crypto'
 
 export async function GET(request: Request) {
   try {
     const supabase = await createSupabaseServerClient()
+
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
+      console.error('Auth Error in my-orders:', authError)
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const userId = user.id
+    console.log('✅ Fetching orders for user:', userId)
 
-    const { data: requests, error } = await supabase
+    const { data: orders, error: fetchError } = await supabase
       .from('pickup_requests')
       .select(`
         *,
-        requester:profiles!requester_id(id, name, email, phone_encrypted, hostel, gender),
-        accepter:profiles!accepted_by(id, name, email, phone_encrypted, hostel, gender)
+        requester:profiles!pickup_requests_requester_id_fkey(id, name, email, phone, hostel, gender),
+        accepter:profiles!pickup_requests_accepted_by_fkey(id, name, email, phone, hostel, gender)
       `)
       .or(`requester_id.eq.${userId},accepted_by.eq.${userId}`)
       .order('created_at', { ascending: false })
-    
-    if (error) {
-      console.error('Database Error:', error)
-      throw error
+
+    if (fetchError) {
+      console.error('Database error:', fetchError)
+      return NextResponse.json(
+        { error: 'Failed to fetch orders' },
+        { status: 500 }
+      )
     }
-    const safeOrders = requests?.map((req: any) => {
-      const isRequester = req.requester_id === userId
-      const isAccepter = req.accepted_by === userId
-      const isMatched = req.status === 'accepted'
-      
-      let requesterPhone = null
-      let accepterPhone = null
 
-      if (req.requester?.phone_encrypted) {
-        if (isAccepter || isRequester) {
-          requesterPhone = decryptPhone(req.requester.phone_encrypted)
-        }
-      }
-      
-      if (req.accepter?.phone_encrypted) {
-        if ((isRequester && isMatched) || isAccepter) {
-          accepterPhone = decryptPhone(req.accepter.phone_encrypted)
-        }
-      }
+    console.log(`✅ Found ${orders?.length || 0} orders`)
 
-      return {
-        ...req,
-        requester: req.requester ? {
-          ...req.requester,
-          phone: requesterPhone
-        } : null,
-        accepter: req.accepter ? {
-          ...req.accepter,
-          phone: accepterPhone
-        } : null
-      }
+    return NextResponse.json({ 
+      orders: orders || [],
+      userId 
     })
 
-    return NextResponse.json({ orders: safeOrders || [] })
-
   } catch (error: any) {
-    console.error('My orders error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    console.error('❌ Fatal Error in my-orders:', error)
+    return NextResponse.json(
+      { error: error.message || 'Internal Server Error' },
+      { status: 500 }
+    )
   }
 }

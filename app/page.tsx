@@ -68,6 +68,7 @@ export default function HomePage() {
 
       return () => { supabase.removeChannel(channel) }
     }
+
   }, [hostelFilter, gateFilter, checkingAuth, currentUserId])
 
   async function fetchData() {
@@ -86,7 +87,6 @@ export default function HomePage() {
       .gte('created_at', twoHoursAgo)
       .order('price', { ascending: false })
 
-    // Apply Filters
     if (hostelFilter) query = query.eq('hostel', hostelFilter)
     if (gateFilter) query = query.eq('gate_number', gateFilter)
 

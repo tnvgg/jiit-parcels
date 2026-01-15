@@ -1,43 +1,58 @@
 import { NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { createClient } from '@supabase/supabase-js'
 import { sanitizeInput } from '@/lib/sanitize-api'
 import { encryptPhone } from '@/lib/crypto'
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient()
+
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
+
     const body = await request.json()
-    
     const { requesterId, hostel, gateNumber, orderType, eta, paid, details, price, phone, notificationEmail } = body
     
-    if (!requesterId || !hostel || !gateNumber || !orderType || !eta || !price || !phone || !notificationEmail) {
+    if (!requesterId || !phone) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { data: userProfile, error: profileError } = await supabase
+    const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('banned')
+      .select('banned, email')
       .eq('id', requesterId)
       .single()
     
     if (profileError || !userProfile) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'User not found. Please log in.' }, { status: 404 })
     }
-    
+
     if (userProfile.banned) {
       return NextResponse.json({ error: 'You are banned from posting requests.' }, { status: 403 })
+    }
+
+    const email = userProfile.email || ''
+    if (!email.endsWith('@mail.jiit.ac.in')) {
+      return NextResponse.json({ error: 'Only JIIT students (mail.jiit.ac.in) can post requests.' }, { status: 403 })
     }
 
     const phoneEncrypted = encryptPhone(phone)
     const cleanDetails = sanitizeInput(details || '')
     const cleanGate = sanitizeInput(gateNumber)
 
-    await supabase
+    await supabaseAdmin
       .from('profiles')
       .update({ phone_encrypted: phoneEncrypted })
       .eq('id', requesterId)
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('pickup_requests')
       .insert({
         requester_id: requesterId,
@@ -54,12 +69,10 @@ export async function POST(request: Request) {
       .select()
       .single()
     
-    if (error) {
-      console.error('Database insert error:', error)
-      throw error
-    }
+    if (error) throw error
 
     return NextResponse.json({ success: true, request: data })
+    
   } catch (error: any) {
     console.error('Create request error:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })

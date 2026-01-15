@@ -23,7 +23,20 @@ export default function MyOrdersPage() {
         }
         setUserId(user.id)
 
-        const response = await fetch(`/api/my-orders?userId=${user.id}`)
+        // IMPORTANT: Added cache: 'no-store' to stop Next.js from caching empty results
+        const response = await fetch(`/api/my-orders?userId=${user.id}`, {
+            cache: 'no-store',
+            headers: {
+                'Cache-Control': 'no-cache'
+            }
+        })
+        
+        // Handle 401 Unauthorized by redirecting to login
+        if (response.status === 401) {
+            router.push('/login')
+            return
+        }
+
         const data = await response.json()
 
         if (data.orders) {
@@ -38,6 +51,7 @@ export default function MyOrdersPage() {
     loadOrders()
   }, [router])
 
+  // ... (keep the rest of your file exactly as is, starting from isExpired function) ...
   function isExpired(createdAt: string) {
     const orderTime = new Date(createdAt).getTime()
     const now = Date.now()
@@ -66,8 +80,6 @@ export default function MyOrdersPage() {
   return (
     <div className="min-h-screen bg-black py-8 px-4 pb-24">
       <div className="max-w-4xl mx-auto">
-        
-        {}
         <div className="flex items-center gap-4 mb-8">
             <button onClick={() => router.push('/')} className="text-blue-400 hover:text-blue-300 transition flex items-center gap-1">
               <span>←</span> Back
@@ -75,7 +87,6 @@ export default function MyOrdersPage() {
             <h1 className="text-3xl font-bold text-white">Your Activity</h1>
         </div>
 
-        {}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-blue-400 border-b border-blue-900/50 pb-2 inline-block">
@@ -123,19 +134,16 @@ export default function MyOrdersPage() {
                     <div className="flex items-center justify-between pt-4 border-t border-neutral-800">
                       <span className="text-xl font-bold text-white">₹{req.price}</span>
                       
-                      {}
                       {req.status === 'accepted' && req.accepter ? (
                         <div className="text-right">
                           <p className="text-xs text-gray-500 mb-1">Accepted by</p>
                           
                           {expired ? (
-                            
                             <div className="flex items-center gap-1.5 text-gray-600 bg-neutral-800 px-2 py-1 rounded border border-neutral-700/50">
                                 <span>🔒</span>
                                 <span className="text-xs italic">Details Hidden</span>
                             </div>
                           ) : (
-                            
                             <div>
                                 <p className="text-sm font-medium text-blue-400">{req.accepter.name}</p>
                                 {req.accepter.phone && (
@@ -157,8 +165,6 @@ export default function MyOrdersPage() {
           )}
         </div>
 
-
-        {}
         <div>
           <h2 className="text-xl font-bold text-green-400 border-b border-green-900/50 pb-2 mb-4 inline-block">
             📥 Accepted by Me
@@ -188,16 +194,13 @@ export default function MyOrdersPage() {
 
                     <p className="text-gray-300 text-sm mb-4 bg-neutral-800/30 p-3 rounded-lg border border-neutral-800">{req.details}</p>
                     
-                    {}
                     {req.requester && (
                       <div className="flex justify-between items-center mt-2">
                         <div>
                           <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Deliver To</p>
                           {expired ? (
-                            
                              <span className="text-sm font-medium text-gray-600 italic">Student (Archived)</span>
                           ) : (
-                            
                              <p className="text-sm font-bold text-white">{req.requester.name}</p>
                           )}
                         </div>
@@ -229,7 +232,6 @@ export default function MyOrdersPage() {
             </div>
           )}
         </div>
-
       </div>
     </div>
   )

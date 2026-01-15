@@ -1,26 +1,27 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { decryptPhone } from '@/lib/crypto'
 
 export async function GET(request: Request) {
   try {
+    const supabase = await createSupabaseServerClient()
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
-
+    
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
 
-    const { data: requests, error } = await supabaseAdmin
+    const { data: requests, error } = await supabase
       .from('pickup_requests')
       .select(`
         *,
-        requester:profiles!requester_id(id, name, email, phone_encrypted, hostel, gender),
-        accepter:profiles!accepted_by(id, name, email, phone_encrypted, hostel, gender)
+        requester:profiles!pickup_requests_requester_id_fkey(id, name, email, phone_encrypted, hostel, gender),
+        accepter:profiles!pickup_requests_accepted_by_fkey(id, name, email, phone_encrypted, hostel, gender)
       `)
       .or(`requester_id.eq.${userId},accepted_by.eq.${userId}`)
       .order('created_at', { ascending: false })
-
+    
     if (error) {
       throw error
     }
@@ -29,19 +30,19 @@ export async function GET(request: Request) {
       const isRequester = req.requester_id === userId
       const isAccepter = req.accepted_by === userId
       const isMatched = req.status === 'accepted'
-
+      
       let requesterPhone = null
       let accepterPhone = null
 
       if (req.requester?.phone_encrypted) {
         if (isAccepter || isRequester) {
-             requesterPhone = decryptPhone(req.requester.phone_encrypted)
+          requesterPhone = decryptPhone(req.requester.phone_encrypted)
         }
       }
-
+      
       if (req.accepter?.phone_encrypted) {
         if ((isRequester && isMatched) || isAccepter) {
-            accepterPhone = decryptPhone(req.accepter.phone_encrypted)
+          accepterPhone = decryptPhone(req.accepter.phone_encrypted)
         }
       }
 
@@ -59,7 +60,6 @@ export async function GET(request: Request) {
     })
 
     return NextResponse.json({ orders: safeOrders })
-
   } catch (error: any) {
     console.error('My orders error:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })

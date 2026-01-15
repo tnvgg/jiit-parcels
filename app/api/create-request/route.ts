@@ -1,28 +1,29 @@
 import { NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { sanitizeInput } from '@/lib/sanitize-api'
 import { encryptPhone } from '@/lib/crypto'
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createSupabaseServerClient()
     const body = await request.json()
     
     const { requesterId, hostel, gateNumber, orderType, eta, paid, details, price, phone, notificationEmail } = body
-
+    
     if (!requesterId || !hostel || !gateNumber || !orderType || !eta || !price || !phone || !notificationEmail) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
-    const { data: userProfile, error: profileError } = await supabaseAdmin
+    const { data: userProfile, error: profileError } = await supabase
       .from('profiles')
       .select('banned')
       .eq('id', requesterId)
       .single()
-
+    
     if (profileError || !userProfile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
+    
     if (userProfile.banned) {
       return NextResponse.json({ error: 'You are banned from posting requests.' }, { status: 403 })
     }
@@ -31,12 +32,12 @@ export async function POST(request: Request) {
     const cleanDetails = sanitizeInput(details || '')
     const cleanGate = sanitizeInput(gateNumber)
 
-    await supabaseAdmin
+    await supabase
       .from('profiles')
       .update({ phone_encrypted: phoneEncrypted })
       .eq('id', requesterId)
 
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('pickup_requests')
       .insert({
         requester_id: requesterId,
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
       })
       .select()
       .single()
-
+    
     if (error) {
       console.error('Database insert error:', error)
       throw error

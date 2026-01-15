@@ -13,6 +13,8 @@ export default function MyOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
 
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+
   useEffect(() => {
     async function loadOrders() {
       try {
@@ -23,17 +25,16 @@ export default function MyOrdersPage() {
         }
         setUserId(user.id)
 
-        // IMPORTANT: Added cache: 'no-store' to stop Next.js from caching empty results
         const response = await fetch(`/api/my-orders?userId=${user.id}`, {
-            cache: 'no-store',
-            headers: {
-                'Cache-Control': 'no-cache'
-            }
+            cache: 'no-store'
         })
-        
-        // Handle 401 Unauthorized by redirecting to login
-        if (response.status === 401) {
-            router.push('/login')
+
+        if (!response.ok) {
+            const errData = await response.json()
+            setErrorMsg(errData.error || `Error ${response.status}: Failed to load`)
+            if (response.status === 401) {
+                setTimeout(() => router.push('/login'), 2000)
+            }
             return
         }
 
@@ -41,9 +42,12 @@ export default function MyOrdersPage() {
 
         if (data.orders) {
           setRequests(data.orders)
+        } else {
+          console.warn("API returned no 'orders' array:", data)
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to load orders:', error)
+        setErrorMsg(error.message || 'Network error occurred')
       } finally {
         setLoading(false)
       }
@@ -51,7 +55,6 @@ export default function MyOrdersPage() {
     loadOrders()
   }, [router])
 
-  // ... (keep the rest of your file exactly as is, starting from isExpired function) ...
   function isExpired(createdAt: string) {
     const orderTime = new Date(createdAt).getTime()
     const now = Date.now()
@@ -80,6 +83,8 @@ export default function MyOrdersPage() {
   return (
     <div className="min-h-screen bg-black py-8 px-4 pb-24">
       <div className="max-w-4xl mx-auto">
+        
+        {}
         <div className="flex items-center gap-4 mb-8">
             <button onClick={() => router.push('/')} className="text-blue-400 hover:text-blue-300 transition flex items-center gap-1">
               <span>←</span> Back
@@ -87,10 +92,22 @@ export default function MyOrdersPage() {
             <h1 className="text-3xl font-bold text-white">Your Activity</h1>
         </div>
 
+        {}
+        {errorMsg && (
+            <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-xl mb-8 flex items-center gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                    <h3 className="text-red-400 font-bold">Failed to load data</h3>
+                    <p className="text-red-300/80 text-sm">{errorMsg}</p>
+                </div>
+            </div>
+        )}
+
+        {}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold text-blue-400 border-b border-blue-900/50 pb-2 inline-block">
-              📤 Created by Me
+            Created by Me
             </h2>
             <button onClick={() => router.push('/new')} className="text-sm bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition font-medium">
               + New Request
@@ -100,6 +117,7 @@ export default function MyOrdersPage() {
           {myRequests.length === 0 ? (
             <div className="bg-neutral-900/50 border border-neutral-800 rounded-lg p-8 text-center">
               <p className="text-gray-500">You haven't requested anything yet.</p>
+              {userId && <p className="text-xs text-gray-700 mt-2">Debug ID: {userId}</p>}
             </div>
           ) : (
             <div className="grid gap-4">
@@ -164,10 +182,10 @@ export default function MyOrdersPage() {
             </div>
           )}
         </div>
-
+        {}
         <div>
           <h2 className="text-xl font-bold text-green-400 border-b border-green-900/50 pb-2 mb-4 inline-block">
-            📥 Accepted by Me
+           Accepted by Me
           </h2>
 
           {acceptedRequests.length === 0 ? (
@@ -232,6 +250,7 @@ export default function MyOrdersPage() {
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

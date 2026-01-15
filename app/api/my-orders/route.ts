@@ -5,12 +5,14 @@ import { decryptPhone } from '@/lib/crypto'
 export async function GET(request: Request) {
   try {
     const supabase = await createSupabaseServerClient()
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    if (authError || !user) {
+      console.error('My Orders Auth Error:', authError)
+      return NextResponse.json({ error: 'Unauthorized: Session missing or expired' }, { status: 401 })
     }
+
+    const userId = user.id
 
     const { data: requests, error } = await supabase
       .from('pickup_requests')
@@ -23,6 +25,7 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
     
     if (error) {
+      console.error('Database Query Error:', error)
       throw error
     }
 
@@ -59,9 +62,9 @@ export async function GET(request: Request) {
       }
     })
 
-    return NextResponse.json({ orders: safeOrders })
+    return NextResponse.json({ orders: safeOrders || [] })
   } catch (error: any) {
-    console.error('My orders error:', error)
+    console.error('My orders fatal error:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

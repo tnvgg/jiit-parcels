@@ -1,50 +1,72 @@
 import { NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase-server'
+import { createClient } from '@supabase/supabase-js'
+import { decryptPhone } from '@/lib/crypto'
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createSupabaseServerClient()
+    const authHeader = request.headers.get('authorization')
+    const token = authHeader?.replace('Bearer ', '')
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
-      console.error('Auth Error in my-orders:', authError)
+    if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userId = user.id
-    console.log('✅ Fetching orders for user:', userId)
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      }
+    )
 
-    const { data: orders, error: fetchError } = await supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { data: requests, error } = await supabase
       .from('pickup_requests')
       .select(`
         *,
-        requester:profiles!pickup_requests_requester_id_fkey(id, name, email, phone, hostel, gender),
-        accepter:profiles!pickup_requests_accepted_by_fkey(id, name, email, phone, hostel, gender)
+        requester:profiles!requester_id(id, name, email, phone_encrypted, hostel, gender),
+        accepter:profiles!accepted_by(id, name, email, phone_encrypted, hostel, gender)
       `)
-      .or(`requester_id.eq.${userId},accepted_by.eq.${userId}`)
+      .or(`requester_id.eq.${user.id},accepted_by.eq.${user.id}`)
       .order('created_at', { ascending: false })
 
-    if (fetchError) {
-      console.error('Database error:', fetchError)
-      return NextResponse.json(
-        { error: 'Failed to fetch orders' },
-        { status: 500 }
-      )
+    if (error) {
+      throw error
     }
 
-    console.log(`✅ Found ${orders?.length || 0} orders`)
+    const requestsWithDecryptedPhones = requests?.map((req: any) => {
+      const isRequester = req.requester_id === user.id
+      const isAccepter = req.accepted_by === user.id
+      const isMatched = req.status === 'accepted'
 
-    return NextResponse.json({ 
-      orders: orders || [],
-      userId 
+      return {
+        ...req,
+        requester: req.requester ? {
+          ...req.requester,
+          phone: (isMatched && isAccepter && req.requester.phone_encrypted)
+            ? decryptPhone(req.requester.phone_encrypted)
+            : null
+        } : null,
+        accepter: req.accepter ? {
+          ...req.accepter,
+          phone: (isMatched && isRequester && req.accepter.phone_encrypted)
+            ? decryptPhone(req.accepter.phone_encrypted)
+            : null
+        } : null
+      }
     })
 
+    return NextResponse.json({ orders: requestsWithDecryptedPhones })
   } catch (error: any) {
-    console.error('❌ Fatal Error in my-orders:', error)
-    return NextResponse.json(
-      { error: error.message || 'Internal Server Error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

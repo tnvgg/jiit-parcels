@@ -19,33 +19,22 @@ export default function MyOrdersPage() {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
-        if (sessionError || !session?.user) {
-          console.error('Session error:', sessionError)
+        if (sessionError || !session) {
           router.push('/login')
           return
         }
         
-        const user = session.user
-        setUserId(user.id)
-        
-        console.log('🔍 Fetching orders for user:', user.id)
+        setUserId(session.user.id)
 
-        const response = await fetch(`/api/my-orders?t=${Date.now()}`, {
+        const response = await fetch('/api/my-orders', {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`
           },
-          credentials: 'include',
         })
         
-        console.log('📡 Response status:', response.status)
-        
         if (!response.ok) {
-          if (response.status === 401) {
-            console.error('Unauthorized - redirecting to login')
-            router.push('/login')
-            return
-          }
           const errorText = await response.text()
           throw new Error(`Server error: ${response.status} - ${errorText}`)
         }
@@ -56,14 +45,11 @@ export default function MyOrdersPage() {
           throw new Error(data.error)
         }
         
-        console.log('✅ Received orders:', data.orders?.length || 0)
-        
         if (data.orders) {
           setRequests(data.orders)
         }
 
       } catch (err: any) {
-        console.error('❌ Failed to load orders:', err)
         setError(err.message || 'Failed to load orders')
       } finally {
         setLoading(false)
@@ -133,7 +119,6 @@ export default function MyOrdersPage() {
           <h1 className="text-3xl font-bold text-white">Your Activity</h1>
         </div>
 
-        {}
         <div className="mb-12">
           <h2 className="text-xl font-bold text-blue-400 border-b border-blue-900/50 pb-2 mb-4 inline-block">
             Created by Me
@@ -183,7 +168,6 @@ export default function MyOrdersPage() {
           )}
         </div>
 
-        {}
         <div>
           <h2 className="text-xl font-bold text-green-400 border-b border-green-900/50 pb-2 mb-4 inline-block">
             Accepted by Me

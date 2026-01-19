@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export function useProfileGuard() {
   const [profile, setProfile] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Starts true
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient(
@@ -13,23 +13,40 @@ export function useProfileGuard() {
   );
 
   useEffect(() => {
+    let isMounted = true;
+    console.log("ProfileGuard: Starting check...");
+
+    // 1. SAFETY TIMER: Force stop loading after 5 seconds no matter what
+    const safetyTimer = setTimeout(() => {
+      if (isMounted && loading) {
+        console.warn("ProfileGuard: Hit safety timeout!");
+        setLoading(false); 
+        // We don't set an error here, we just let the page render. 
+        // If data is missing, the page will handle it.
+      }
+    }, 5000);
+
     const fetchProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        // 2. Check Session
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
         
-        if (!user) {
-          router.push('/login');
+        if (authError || !user) {
+          console.log("ProfileGuard: No user found, redirecting...");
+          if (isMounted) router.push('/login');
           return;
         }
 
-        let { data: profileData, error } = await supabase
+        // 3. Get Profile
+        let { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
 
+        // 4. Self-Healing (Create if missing)
         if (!profileData) {
-          console.log("Profile missing, creating on the fly...");
+          console.log("ProfileGuard: Profile missing, creating now...");
           const { data: newProfile, error: createError } = await supabase
             .from('profiles')
             .insert({
@@ -43,20 +60,33 @@ export function useProfileGuard() {
             .select()
             .single();
             
-          if (createError) throw createError;
-          profileData = newProfile;
+          if (createError) {
+             console.error("ProfileGuard: Creation failed", createError);
+             // Don't throw, just continue so page doesn't crash
+          } else {
+             profileData = newProfile;
+          }
         }
 
-        setProfile(profileData);
+        if (isMounted) {
+          setProfile(profileData);
+          setLoading(false); // Success!
+        }
+
       } catch (err: any) {
-        console.error('Profile Guard Error:', err);
-        setError(err.message);
+        console.error('ProfileGuard Error:', err);
+        if (isMounted) {
+           setError(err.message);
+           setLoading(false); // Stop spinning on error
+        }
       } finally {
-        setLoading(false);
+        clearTimeout(safetyTimer);
       }
     };
 
     fetchProfile();
+
+    return () => { isMounted = false; clearTimeout(safetyTimer); };
   }, [router, supabase]);
 
   return { profile, loading, error };

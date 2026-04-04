@@ -1,35 +1,23 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { decryptPhone } from '@/lib/crypto'
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    const token = authHeader?.replace('Bearer ', '')
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      }
-    )
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const supabaseServer = await createSupabaseServerClient()
+    const { data: { user }, error: authError } = await supabaseServer.auth.getUser()
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: requests, error } = await supabase
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+
+    const { data: requests, error } = await supabaseAdmin
       .from('pickup_requests')
       .select(`
         *,
@@ -67,6 +55,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ orders: requestsWithDecryptedPhones })
   } catch (error: any) {
+    console.error("My Orders API Error:", error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

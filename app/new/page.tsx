@@ -159,6 +159,21 @@ export default function NewRequestPage() {
           <input type="email" value={notifEmail} onChange={(e) => setNotifEmail(e.target.value)} className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg focus:outline-none focus:border-blue-500 transition" required />
           <p className="text-xs text-gray-500 mt-1">Use a personal email (Gmail/iCloud) to ensure you receive alerts.</p>
         </div>
+        {}
+        <div>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Additional Details</label>
+          <textarea 
+            value={details} 
+            onChange={(e) => setDetails(e.target.value)} 
+            maxLength={1000}
+            rows={3}
+            className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg resize-y" 
+            placeholder="Specify package details." 
+          />
+          <div className="text-right text-xs text-gray-500 mt-1">
+            {details.length}/1000
+          </div>
+        </div>
 
         <FeeSlider initialValue={25} onChange={setPrice} />
 

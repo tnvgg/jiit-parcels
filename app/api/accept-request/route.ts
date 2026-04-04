@@ -1,26 +1,34 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { decryptPhone } from '@/lib/crypto'
 import { sendAcceptanceEmail } from '@/lib/email'
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json()
-    const { requestId, accepterId } = body
+    const supabaseServer = await createSupabaseServerClient()
+    const { data: { user }, error: authError } = await supabaseServer.auth.getUser()
 
-    if (!requestId || !accepterId) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 })
     }
 
-    const supabase = createClient(
+    const body = await request.json()
+    const { requestId } = body
+
+    if (!requestId) {
+      return NextResponse.json({ error: 'Request ID is required' }, { status: 400 })
+    }
+
+    const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    const { data: accepterProfile, error: accepterError } = await supabase
+    const { data: accepterProfile, error: accepterError } = await supabaseAdmin
       .from('profiles')
       .select('banned, name, phone_encrypted')
-      .eq('id', accepterId)
+      .eq('id', user.id) 
       .single()
 
     if (accepterError || !accepterProfile) {
@@ -31,7 +39,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'You are banned.' }, { status: 403 })
     }
 
-    const { data: pickupRequest, error: requestError } = await supabase
+    const { data: pickupRequest, error: requestError } = await supabaseAdmin
       .from('pickup_requests')
       .select(`
         *,
@@ -49,20 +57,22 @@ export async function POST(request: Request) {
     }
 
     if (pickupRequest.status === 'accepted') {
-      return NextResponse.json({ error: 'Request already accepted' }, { status: 400 })
+      return NextResponse.json({ error: 'This request has already been accepted' }, { status: 400 })
+    }
+    
+    if (pickupRequest.requester_id === user.id) {
+      return NextResponse.json({ error: 'You cannot accept your own request' }, { status: 400 })
     }
 
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('pickup_requests')
       .update({
         status: 'accepted',
-        accepted_by: accepterId
+        accepted_by: user.id 
       })
       .eq('id', requestId)
 
-    if (updateError) {
-      throw updateError
-    }
+    if (updateError) throw updateError
 
     const requesterPhone = pickupRequest.requester?.phone_encrypted 
       ? decryptPhone(pickupRequest.requester.phone_encrypted) 
@@ -87,7 +97,7 @@ export async function POST(request: Request) {
         }
       })
     } catch (emailError) {
-      console.error('Email failed:', emailError)
+      console.error('Email failed to send, but request accepted:', emailError)
     }
 
     return NextResponse.json({ 
@@ -99,6 +109,6 @@ export async function POST(request: Request) {
     })
   } catch (error: any) {
     console.error('Accept request error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

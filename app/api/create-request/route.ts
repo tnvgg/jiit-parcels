@@ -1,37 +1,39 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createSupabaseServerClient } from '@/lib/supabase-server'
 import { sanitizeInput } from '@/lib/sanitize-api'
 import { encryptPhone } from '@/lib/crypto'
 
 export async function POST(request: Request) {
   try {
+    const supabaseServer = await createSupabaseServerClient()
+    const { data: { user }, error: authError } = await supabaseServer.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized. Please log in.' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { hostel, gateNumber, orderType, eta, paid, details, price, phone, notificationEmail } = body
+    
+    if (!phone || !gateNumber || !price) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
 
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
+      { auth: { autoRefreshToken: false, persistSession: false } }
     )
-
-    const body = await request.json()
-    const { requesterId, hostel, gateNumber, orderType, eta, paid, details, price, phone, notificationEmail } = body
-    
-    if (!requesterId || !phone) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
-    }
 
     const { data: userProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('banned, email')
-      .eq('id', requesterId)
+      .eq('id', user.id) 
       .single()
     
     if (profileError || !userProfile) {
-      return NextResponse.json({ error: 'User not found. Please log in.' }, { status: 404 })
+      return NextResponse.json({ error: 'User profile not found.' }, { status: 404 })
     }
 
     if (userProfile.banned) {
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
 
     const email = userProfile.email || ''
     if (!email.endsWith('@mail.jiit.ac.in')) {
-      return NextResponse.json({ error: 'Only JIIT students (mail.jiit.ac.in) can post requests.' }, { status: 403 })
+      return NextResponse.json({ error: 'Only JIIT students can post requests.' }, { status: 403 })
     }
 
     const phoneEncrypted = encryptPhone(phone)
@@ -50,12 +52,12 @@ export async function POST(request: Request) {
     await supabaseAdmin
       .from('profiles')
       .update({ phone_encrypted: phoneEncrypted })
-      .eq('id', requesterId)
+      .eq('id', user.id)
 
     const { data, error } = await supabaseAdmin
       .from('pickup_requests')
       .insert({
-        requester_id: requesterId,
+        requester_id: user.id, 
         hostel,
         gate_number: cleanGate,
         order_type: orderType,
@@ -75,6 +77,6 @@ export async function POST(request: Request) {
     
   } catch (error: any) {
     console.error('Create request error:', error)
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

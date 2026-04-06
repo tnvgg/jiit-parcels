@@ -1,7 +1,7 @@
 export const PRICING_RULES = {
-  day: { min: 25, suggested: 35, max: 50 },      
-  night: { min: 20, suggested: 30, max: 40 },   
-  lateNight: { min: 40, suggested: 45, max: 60 } 
+  day: { min: 15, suggested: 20, max: 50 },      
+  night: { min: 20, suggested: 25, max: 40 },   
+  lateNight: { min: 20, suggested: 25, max: 50 } 
 } as const;
 
 export function getPricingForTime(hour: number) {

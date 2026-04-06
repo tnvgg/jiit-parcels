@@ -150,6 +150,44 @@ export default function NewRequestPage() {
         </div>
 
         <div>
+           <label className="block text-sm font-medium text-gray-300 mb-2">ETA</label>
+           <input
+           type="text"
+           value={customEta}
+           onChange={(e) => setCustomEta(e.target.value)}
+           placeholder="e.g. 10 mins / 5:30 PM"
+           className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg"
+           />
+        </div>
+        <div>
+  <label className="block text-sm font-medium text-gray-300 mb-2">Payment</label>
+
+  <div className="flex gap-4 text-white">
+    <label className="flex items-center cursor-pointer">
+      <input
+        type="radio"
+        name="paid"
+        checked={paid === true}
+        onChange={() => setPaid(true)}
+        className="mr-2"
+      />
+      Paid
+    </label>
+
+    <label className="flex items-center cursor-pointer">
+      <input
+        type="radio"
+        name="paid"
+        checked={paid === false}
+        onChange={() => setPaid(false)}
+        className="mr-2"
+      />
+      Unpaid
+    </label>
+  </div>
+</div>
+
+        <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number</label>
           <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg focus:outline-none focus:border-blue-500 transition" required placeholder="9876543210" />
         </div>

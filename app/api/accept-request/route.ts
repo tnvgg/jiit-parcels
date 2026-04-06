@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createSupabaseServerClient } from '@/lib/supabase-server'
-import { decryptPhone } from '@/lib/crypto'
+import { decryptPhone, encryptPhone } from '@/lib/crypto'
 import { sendAcceptanceEmail } from '@/lib/email'
 
 export async function POST(request: Request) {
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json()
-    const { requestId } = body
+    const { requestId, phone } = body
 
     if (!requestId) {
       return NextResponse.json({ error: 'Request ID is required' }, { status: 400 })
@@ -24,6 +24,14 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     )
+
+    if (phone) {
+      const phoneEncrypted = encryptPhone(phone)
+      await supabaseAdmin
+        .from('profiles')
+        .update({ phone_encrypted: phoneEncrypted })
+        .eq('id', user.id)
+    }
 
     const { data: accepterProfile, error: accepterError } = await supabaseAdmin
       .from('profiles')

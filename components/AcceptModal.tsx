@@ -24,25 +24,24 @@ export default function AcceptModal({ request, currentUserId, onClose, onSuccess
   } | null>(null)
 
   useEffect(() => {
-    async function fetchUserPhone() {
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('phone')
-          .eq('id', currentUserId)
-          .single()
-        
-        if (data?.phone) {
-          setPhoneNumber(data.phone)
-        }
-      } catch (err) {
-        console.error('Error fetching phone:', err)
-      } finally {
-        setLoadingProfile(false)
+  async function fetchUserPhone() {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('phone_encrypted')
+        .eq('id', currentUserId)
+        .single()
+      if (data?.phone_encrypted) {
+        setPhoneNumber('SAVED_IN_DB_') 
       }
+    } catch (err) {
+      console.error('Error fetching phone:', err)
+    } finally {
+      setLoadingProfile(false)
     }
-    fetchUserPhone()
-  }, [currentUserId])
+  }
+  fetchUserPhone()
+}, [currentUserId])
 
   async function handleAccept() {
     if (!phoneNumber || phoneNumber.length !== 10) {
@@ -59,8 +58,7 @@ export default function AcceptModal({ request, currentUserId, onClose, onSuccess
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestId: request.id,
-          accepterId: currentUserId,
-          accepterPhone: phoneNumber 
+          phone: phoneNumber 
         })
       })
 
@@ -128,7 +126,6 @@ export default function AcceptModal({ request, currentUserId, onClose, onSuccess
       <div className="bg-neutral-900 border border-neutral-800 rounded-lg max-w-md w-full p-6 shadow-2xl">
         <h3 className="text-xl font-bold text-white mb-4">Accept Pickup Request?</h3>
         
-        {}
         <div className="bg-neutral-800/50 p-4 rounded-lg mb-6 space-y-3 border border-neutral-700/50">
           <div className="flex justify-between text-sm">
             <span className="text-gray-400">Hostel</span>
@@ -148,7 +145,6 @@ export default function AcceptModal({ request, currentUserId, onClose, onSuccess
           </div>
         </div>
 
-        {}
         <div className="mb-6">
           <label className="block text-xs font-medium text-gray-400 mb-2 uppercase tracking-wider">
             Confirm Your Phone Number <span className="text-red-500">*</span>

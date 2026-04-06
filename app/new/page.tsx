@@ -9,20 +9,15 @@ type OrderType = 'food' | 'package'
 
 export default function NewRequestPage() {
   const router = useRouter()
-
   const [loading, setLoading] = useState(true)
   const [userSession, setUserSession] = useState<any>(null)
-
   const [hostel, setHostel] = useState<Hostel>('ABB3')
   const [gateNumber, setGateNumber] = useState('')
   const [orderType, setOrderType] = useState<OrderType>('food')
-  const [etaType, setEtaType] = useState<'here' | 'custom'>('here')
   const [customEta, setCustomEta] = useState('')
   const [paid, setPaid] = useState(false)
-  
   const [phone, setPhone] = useState('')
   const [notifEmail, setNotifEmail] = useState('')
-  
   const [details, setDetails] = useState('')
   const [price, setPrice] = useState<number>(25)
   const [submitting, setSubmitting] = useState(false)
@@ -30,10 +25,6 @@ export default function NewRequestPage() {
 
   useEffect(() => {
     let isMounted = true
-    const timer = setTimeout(() => {
-      if (isMounted) setLoading(false)
-    }, 4000)
-
     async function loadData() {
       try {
         const { data: { user } } = await supabase.auth.getUser()
@@ -42,13 +33,11 @@ export default function NewRequestPage() {
           return
         }
         if (isMounted) setUserSession(user)
-
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single()
-
         if (isMounted && profile) {
           setHostel(profile.hostel || 'ABB3')
           setPhone(profile.phone || '')
@@ -57,24 +46,21 @@ export default function NewRequestPage() {
           setNotifEmail(user.email || '')
         }
       } catch (err) {
-        console.error("Load Error:", err)
+        console.error(err)
       } finally {
         if (isMounted) setLoading(false)
       }
     }
-
     loadData()
-    return () => { isMounted = false; clearTimeout(timer) }
+    return () => { isMounted = false }
   }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     setErrorMsg(null)
-    
     try {
       if (!userSession) throw new Error("Please log in again")
-
       const response = await fetch('/api/create-request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -82,7 +68,7 @@ export default function NewRequestPage() {
           hostel,
           gateNumber,
           orderType,
-          eta: etaType === 'here' ? 'Already here' : customEta,
+          eta: customEta || 'Already here',
           paid,
           details,
           price,
@@ -90,10 +76,8 @@ export default function NewRequestPage() {
           notificationEmail: notifEmail
         })
       })
-
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to create request')
-      
       router.push('/')
     } catch (err: any) {
       setErrorMsg(err.message)
@@ -116,10 +100,8 @@ export default function NewRequestPage() {
         <button onClick={() => router.push('/')} className="text-blue-400 hover:text-blue-300 mb-4 transition">← Back</button>
         <h1 className="text-2xl font-bold text-white">New Pickup Request</h1>
       </div>
-
       <form onSubmit={handleSubmit} className="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-6">
         {errorMsg && <div className="p-3 bg-red-900/20 text-red-400 border border-red-800 rounded">{errorMsg}</div>}
-
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Hostel</label>
           <select value={hostel} onChange={(e) => setHostel(e.target.value as Hostel)} className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg focus:outline-none focus:border-blue-500 transition">
@@ -130,7 +112,6 @@ export default function NewRequestPage() {
             <option value="H5">H5</option>
           </select>
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Gate Number</label>
           <select value={gateNumber} onChange={(e) => setGateNumber(e.target.value)} className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg focus:outline-none focus:border-blue-500 transition" required>
@@ -140,7 +121,6 @@ export default function NewRequestPage() {
             <option value="3">Gate 3</option>
           </select>
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Order Type</label>
           <div className="flex gap-4 text-white">
@@ -148,7 +128,6 @@ export default function NewRequestPage() {
             <label className="flex items-center cursor-pointer hover:text-blue-400 transition"><input type="radio" name="orderType" value="package" checked={orderType === 'package'} onChange={(e) => setOrderType(e.target.value as OrderType)} className="mr-2" /> Package</label>
           </div>
         </div>
-
         <div>
            <label className="block text-sm font-medium text-gray-300 mb-2">ETA</label>
            <input
@@ -160,61 +139,30 @@ export default function NewRequestPage() {
            />
         </div>
         <div>
-  <label className="block text-sm font-medium text-gray-300 mb-2">Payment</label>
-
-  <div className="flex gap-4 text-white">
-    <label className="flex items-center cursor-pointer">
-      <input
-        type="radio"
-        name="paid"
-        checked={paid === true}
-        onChange={() => setPaid(true)}
-        className="mr-2"
-      />
-      Paid
-    </label>
-
-    <label className="flex items-center cursor-pointer">
-      <input
-        type="radio"
-        name="paid"
-        checked={paid === false}
-        onChange={() => setPaid(false)}
-        className="mr-2"
-      />
-      Unpaid
-    </label>
-  </div>
-</div>
-
+          <label className="block text-sm font-medium text-gray-300 mb-2">Payment</label>
+          <div className="flex gap-4 text-white">
+            <label className="flex items-center cursor-pointer">
+              <input type="radio" name="paid" checked={paid === true} onChange={() => setPaid(true)} className="mr-2" /> Paid
+            </label>
+            <label className="flex items-center cursor-pointer">
+              <input type="radio" name="paid" checked={paid === false} onChange={() => setPaid(false)} className="mr-2" /> Unpaid
+            </label>
+          </div>
+        </div>
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Phone Number</label>
           <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg focus:outline-none focus:border-blue-500 transition" required placeholder="9876543210" />
         </div>
-
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Notification Email</label>
           <input type="email" value={notifEmail} onChange={(e) => setNotifEmail(e.target.value)} className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg focus:outline-none focus:border-blue-500 transition" required />
-          <p className="text-xs text-gray-500 mt-1">Use a personal email (Gmail/iCloud) to ensure you receive alerts.</p>
         </div>
-        {}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">Additional Details</label>
-          <textarea 
-            value={details} 
-            onChange={(e) => setDetails(e.target.value)} 
-            maxLength={1000}
-            rows={3}
-            className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg resize-y" 
-            placeholder="Specify package details." 
-          />
-          <div className="text-right text-xs text-gray-500 mt-1">
-            {details.length}/1000
-          </div>
+          <textarea value={details} onChange={(e) => setDetails(e.target.value)} maxLength={1000} rows={3} className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 text-white rounded-lg resize-y" placeholder="Specify package details." />
+          <div className="text-right text-xs text-gray-500 mt-1">{details.length}/1000</div>
         </div>
-
         <FeeSlider initialValue={25} onChange={setPrice} />
-
         <button type="submit" disabled={submitting} className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-800 transition font-medium">
           {submitting ? 'Posting...' : 'Post Request'}
         </button>

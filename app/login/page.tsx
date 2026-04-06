@@ -16,19 +16,16 @@ export default function LoginPage() {
 
   async function checkExistingAuth() {
     const { data: { user } } = await supabase.auth.getUser()
-    
     if (user) {
       router.push('/')
       return
     }
-    
     setChecking(false)
   }
 
   async function handleGoogleLogin() {
     setLoading(true)
     setError(null)
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
@@ -40,7 +37,6 @@ export default function LoginPage() {
         },
       },
     })
-
     if (error) {
       setError(error.message)
       setLoading(false)
@@ -49,21 +45,20 @@ export default function LoginPage() {
 
   if (checking) {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-full mb-4">
-             {}
           </div>
           <h1 className="text-3xl font-bold text-white">JIIT Parcels</h1>
-          <p className="text-gray-600 mt-2">Student-to-student coordination</p>
+          <p className="text-gray-400 mt-2">Student-to-student coordination</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl p-8">
@@ -105,6 +100,18 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      <footer className="mt-8 text-gray-500 text-sm">
+        built with <span className="text-red-500">❤️</span> by{' '}
+        <a 
+          href="https://github.com/tnvgg/jiit-parcels" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-gray-400 hover:text-white underline underline-offset-4 transition"
+        >
+          tanvisha
+        </a>
+      </footer>
     </div>
   )
 }

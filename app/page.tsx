@@ -114,8 +114,8 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-gray-200 p-4 pb-20">
-      <div className="max-w-2xl mx-auto space-y-6">
+    <div className="min-h-screen bg-black text-gray-200 p-4 flex flex-col">
+      <div className="max-w-2xl mx-auto space-y-6 w-full flex-1">
         {}
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-white tracking-tight">JIIT Parcels</h1>
@@ -218,6 +218,17 @@ export default function HomePage() {
           </div>
         )}
       </div>
+      <footer className="py-10 border-t border-neutral-900 text-center text-gray-500 text-sm">
+        built with <span className="text-red-500">❤️</span> by{' '}
+        <a 
+          href="https://github.com/tnvgg/jiit-parcels" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-gray-400 hover:text-white underline underline-offset-4 transition"
+        >
+          tanvisha
+        </a>
+      </footer>
     </div>
   )
 }
